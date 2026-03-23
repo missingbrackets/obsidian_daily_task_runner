@@ -88,3 +88,28 @@ def replace_line(file_path: Path, line_number: int, new_line: str) -> None:
         new_line += "\n"
     lines[idx] = new_line
     _write_lines(file_path, lines)
+
+
+def update_due_date(task: Task, new_date: str) -> None:
+    """Update (or add) the due date on a task line in its source file.
+
+    new_date should be a YYYY-MM-DD string.
+    """
+    import re
+
+    lines = _read_lines(task.file_path)
+    idx = task.line_number - 1
+    if idx >= len(lines):
+        raise IndexError(f"Line {task.line_number} out of range in {task.file_path}")
+
+    line = lines[idx]
+    due_pattern = re.compile(r"📅\s*\d{4}-\d{2}-\d{2}")
+
+    if due_pattern.search(line):
+        line = due_pattern.sub(f"📅 {new_date}", line)
+    else:
+        # Insert due date before the newline
+        line = line.rstrip("\n") + f" 📅 {new_date}\n"
+
+    lines[idx] = line
+    _write_lines(task.file_path, lines)

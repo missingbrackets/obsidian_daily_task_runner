@@ -84,10 +84,11 @@ if not st.session_state.notes:
 2. Click **Scan Vault** to discover your tasks
 3. Use the pages in the sidebar to:
    - **Morning Review** – See today's tasks, overdue items, and yesterday's carryover
-   - **Weekly Planning** – Plan your week with tasks grouped by priority
-   - **Overdue Tasks** – Review and manage overdue items
-   - **Daily Selection** – Pick your focus tasks for today
+   - **Weekly Planning** – Pull project tasks due this week into the weekly note
+   - **Overdue Tasks** – Review, reschedule, or close overdue items
+   - **Daily Selection** – Pick today's focus tasks from the weekly note
    - **AI Planner** – Get AI-powered task prioritization suggestions
+   - **Projects** – Create projects and tasks (the source of truth)
 
 ### Scanned Folders
 
