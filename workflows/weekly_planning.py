@@ -94,30 +94,45 @@ def get_unscheduled_project_tasks(notes: list[NoteFile]) -> list[Task]:
     ]
 
 
+# The category sub-sections in the weekly note template
+WEEKLY_CATEGORIES = [
+    "🧑‍💻 Work",
+    "🏠 Life Admin",
+    "💪 Health",
+    "🌱 Personal / Growth",
+]
+
+
+def _build_task_line(task: Task, vault_path: str) -> str:
+    """Build a markdown task line with metadata and project source."""
+    line = f"- [ ] {task.description}"
+    if task.due_date:
+        line += f" 📅 {task.due_date.isoformat()}"
+    if task.priority != 3:
+        pmap = {1: "🔺", 2: "⏫", 3: "🔼", 4: "🔽", 5: "⏬"}
+        line += f" {pmap.get(task.priority, '')}"
+    for tag in task.tags:
+        line += f" #{tag}"
+    line += f" {build_project_source_comment(task, vault_path)}"
+    return line
+
+
 def write_tasks_to_weekly_note(
     weekly_note_path: Path,
-    tasks: list[Task],
+    task_assignments: dict[str, list[Task]],
     vault_path: str,
-    section: str = "Master Task List (This Week)",
 ) -> int:
-    """Write project tasks into the weekly note with project source labels.
+    """Write project tasks into the weekly note under category sub-sections.
 
-    Returns count written.
+    task_assignments maps category heading (e.g. "🧑‍💻 Work") to tasks.
+    Returns total count written.
     """
     count = 0
-    for task in tasks:
-        line = f"- [ ] {task.description}"
-        if task.due_date:
-            line += f" 📅 {task.due_date.isoformat()}"
-        if task.priority != 3:
-            pmap = {1: "🔺", 2: "⏫", 3: "🔼", 4: "🔽", 5: "⏬"}
-            line += f" {pmap.get(task.priority, '')}"
-        for tag in task.tags:
-            line += f" #{tag}"
-        # Embed project source for sync tracking
-        line += f" {build_project_source_comment(task, vault_path)}"
-        append_task_to_section(weekly_note_path, section, line)
-        count += 1
+    for category, tasks in task_assignments.items():
+        for task in tasks:
+            line = _build_task_line(task, vault_path)
+            append_task_to_section(weekly_note_path, category, line)
+            count += 1
     return count
 
 

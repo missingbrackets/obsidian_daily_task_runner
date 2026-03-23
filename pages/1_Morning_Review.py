@@ -8,6 +8,7 @@ from core.task_parser import get_all_tasks
 from core.models import TaskStatus
 from core.rescan import rescan_vault
 from workflows.morning_review import morning_summary
+from workflows.weekly_planning import get_weekly_note_tasks
 from workflows.carryover import (
     find_yesterdays_note,
     find_todays_note,
@@ -99,12 +100,22 @@ if summary["yesterday_incomplete"]:
 else:
     st.info("No incomplete tasks from yesterday.")
 
-# ── By folder ──────────────────────────────────────────────────────────
+# ── This week's tasks by category ─────────────────────────────────────
 
 st.divider()
-st.subheader("📂 Open Tasks by Folder")
-for folder, tasks in summary["by_folder"].items():
-    with st.expander(f"{folder} ({len(tasks)} tasks)"):
-        for t in sorted(tasks, key=lambda x: x.priority):
-            due = f" 📅 {t.due_date}" if t.due_date else ""
-            st.markdown(f"- {t.description}{due}")
+st.subheader("📋 This Week's Tasks (from Weekly Note)")
+
+weekly_tasks = get_weekly_note_tasks(notes)
+if weekly_tasks:
+    by_section: dict[str, list] = {}
+    for t in weekly_tasks:
+        by_section.setdefault(t.section, []).append(t)
+
+    for section, tasks in by_section.items():
+        with st.expander(f"**{section}** ({len(tasks)} tasks)", expanded=True):
+            for t in sorted(tasks, key=lambda x: x.priority):
+                status_icon = "🔴" if t.is_overdue else ("🟡" if t.is_due_today else "⚪")
+                due = f" 📅 {t.due_date}" if t.due_date else ""
+                st.markdown(f"{status_icon} {t.description}{due}")
+else:
+    st.info("No tasks in this week's weekly note yet. Go to **Weekly Planning** to set up your week.")

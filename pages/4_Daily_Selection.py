@@ -36,23 +36,26 @@ if not candidates:
     )
     st.stop()
 
+# ── Group by category section from weekly note ─────────────────────────
+
+by_section: dict[str, list] = {}
+for t in candidates:
+    by_section.setdefault(t.section, []).append(t)
+
 st.divider()
 st.subheader(f"Weekly Tasks ({len(candidates)})")
 
-# ── Task selection ─────────────────────────────────────────────────────
-
 selected_tasks = []
-for t in candidates[:50]:
-    status_icon = "🔴" if t.is_overdue else ("🟡" if t.is_due_today else "⚪")
-    prio_icon = {1: "🔺", 2: "⏫", 3: "", 4: "🔽", 5: "⏬"}.get(t.priority, "")
-    due_str = f" 📅 {t.due_date}" if t.due_date else ""
-    label = f"{status_icon} {prio_icon} {t.description}{due_str}"
+for section, tasks in by_section.items():
+    st.markdown(f"**{section}**")
+    for t in tasks:
+        status_icon = "🔴" if t.is_overdue else ("🟡" if t.is_due_today else "⚪")
+        prio_icon = {1: "🔺", 2: "⏫", 3: "", 4: "🔽", 5: "⏬"}.get(t.priority, "")
+        due_str = f" 📅 {t.due_date}" if t.due_date else ""
+        label = f"{status_icon} {prio_icon} {t.description}{due_str}"
 
-    if st.checkbox(label, key=f"sel_{t.file_path}_{t.line_number}"):
-        selected_tasks.append(t)
-
-if len(candidates) > 50:
-    st.caption(f"Showing 50 of {len(candidates)} tasks.")
+        if st.checkbox(label, key=f"sel_{t.file_path}_{t.line_number}"):
+            selected_tasks.append(t)
 
 # ── Write to daily note ───────────────────────────────────────────────
 

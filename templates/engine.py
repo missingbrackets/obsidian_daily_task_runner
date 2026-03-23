@@ -47,8 +47,23 @@ DAILY_TEMPLATE = """\
 - [ ]
 
 ## Case Pricings
+```tasks
+not done
+group by due
+path includes To Do/06 Case Pricing
+hide due date
+hide backlink
+```
 
 ## 📋 Tasks Still Open This Week
+```tasks
+not done
+group by due
+path includes To Do/02 Weekly
+path does not include Case Pricing
+hide due date
+hide backlink
+```
 """
 
 WEEKLY_TEMPLATE = """\
@@ -86,9 +101,40 @@ WEEKLY_TEMPLATE = """\
 
 ---
 
-## Project Tasks Due This Week
+## Project Tasks Not Done Due this Week
+```tasks
+not done
+path includes To Do/03 Projects
+due before this week
+sort by due
+sort by priority
+group by filename
+```
+```tasks
+not done
+path includes To Do/03 Projects
+due this week
+sort by due
+sort by priority
+group by filename
+```
 
-## Project Tasks Due Next Week
+## Project Tasks Not Done Due Next Week
+```tasks
+not done
+path includes To Do/03 Projects
+due next week
+sort by due
+group by filename
+```
+
+## Project Tasks Not Done Due After Next Week
+```tasks
+not done
+path includes To Do/03 Projects
+due after next week
+sort by due
+```
 """
 
 PROJECT_TEMPLATE = """\
