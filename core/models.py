@@ -31,6 +31,8 @@ class Task:
     tags: list[str] = dataclasses.field(default_factory=list)
     section: str = ""           # heading the task lives under
     source_folder: str = ""     # which scan folder it came from
+    project_source: str = ""    # relative path to originating project file
+    project_line: int = 0       # line number in the originating project file
 
     @property
     def is_overdue(self) -> bool:

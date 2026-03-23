@@ -14,6 +14,7 @@ from workflows.weekly_planning import (
     write_tasks_to_weekly_note,
 )
 from templates.engine import create_weekly_note, create_project_note
+from core.rescan import rescan_vault
 
 st.set_page_config(page_title="Weekly Planning", page_icon="📅", layout="wide")
 st.title("📅 Weekly Planning")
@@ -52,8 +53,9 @@ if not weekly_note:
     st.subheader("📝 Create Weekly Note")
     if st.button("Create This Week's Note", type="primary"):
         path = create_weekly_note(st.session_state.vault_path, WEEKLY_FOLDER)
+        rescan_vault()
         st.success(f"Created: {path.name}")
-        st.info("Re-scan vault to see the new note.")
+        st.rerun()
     st.divider()
 
 # ── Pull project tasks into weekly note ────────────────────────────────
@@ -79,9 +81,12 @@ if all_pullable:
             type="primary",
             help="Writes these project tasks into the weekly note's Master Task List",
         ):
-            count = write_tasks_to_weekly_note(weekly_note.path, all_pullable)
+            count = write_tasks_to_weekly_note(
+                weekly_note.path, all_pullable, st.session_state.vault_path,
+            )
+            rescan_vault()
             st.success(f"Pulled {count} tasks into weekly note!")
-            st.info("Re-scan vault to refresh.")
+            st.rerun()
     else:
         st.warning("Create a weekly note first (button above) before pulling tasks.")
 else:

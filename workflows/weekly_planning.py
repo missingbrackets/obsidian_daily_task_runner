@@ -13,7 +13,7 @@ from pathlib import Path
 from config import PROJECTS_FOLDER, WEEKLY_FOLDER
 from core.models import NoteFile, Task, TaskStatus
 from core.task_parser import get_all_tasks
-from core.task_writer import append_task_to_section
+from core.task_writer import append_task_to_section, build_project_source_comment
 
 
 def _week_bounds(ref: date | None = None) -> tuple[date, date]:
@@ -97,9 +97,13 @@ def get_unscheduled_project_tasks(notes: list[NoteFile]) -> list[Task]:
 def write_tasks_to_weekly_note(
     weekly_note_path: Path,
     tasks: list[Task],
+    vault_path: str,
     section: str = "Master Task List (This Week)",
 ) -> int:
-    """Write project tasks into the weekly note. Returns count written."""
+    """Write project tasks into the weekly note with project source labels.
+
+    Returns count written.
+    """
     count = 0
     for task in tasks:
         line = f"- [ ] {task.description}"
@@ -110,6 +114,8 @@ def write_tasks_to_weekly_note(
             line += f" {pmap.get(task.priority, '')}"
         for tag in task.tags:
             line += f" #{tag}"
+        # Embed project source for sync tracking
+        line += f" {build_project_source_comment(task, vault_path)}"
         append_task_to_section(weekly_note_path, section, line)
         count += 1
     return count

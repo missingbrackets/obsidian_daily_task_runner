@@ -1,20 +1,25 @@
-"""Overdue task review workflow."""
+"""Overdue task review workflow.
+
+Only surfaces overdue tasks from the Projects folder (source of truth).
+"""
 
 from __future__ import annotations
 
 from datetime import date
 
+from config import PROJECTS_FOLDER
 from core.models import NoteFile, Task, TaskStatus
 from core.task_parser import get_all_tasks
 
 
 def get_overdue_tasks(notes: list[NoteFile]) -> list[Task]:
-    """All open tasks past their due date."""
+    """Open project tasks past their due date."""
     today = date.today()
     return sorted(
         [
             t for t in get_all_tasks(notes)
-            if t.status == TaskStatus.OPEN
+            if t.source_folder == PROJECTS_FOLDER
+            and t.status == TaskStatus.OPEN
             and t.due_date is not None
             and t.due_date < today
         ],
@@ -27,15 +32,16 @@ def overdue_summary(notes: list[NoteFile]) -> dict:
     return {
         "overdue": overdue,
         "count": len(overdue),
-        "by_folder": _group_by_folder(overdue),
+        "by_project": _group_by_project(overdue),
         "by_age": _group_by_age(overdue),
     }
 
 
-def _group_by_folder(tasks: list[Task]) -> dict[str, list[Task]]:
+def _group_by_project(tasks: list[Task]) -> dict[str, list[Task]]:
+    """Group by project file name."""
     groups: dict[str, list[Task]] = {}
     for t in tasks:
-        groups.setdefault(t.source_folder, []).append(t)
+        groups.setdefault(t.file_path.stem, []).append(t)
     return groups
 
 

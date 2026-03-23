@@ -7,6 +7,7 @@ from config import DAILY_FOLDER
 from core.task_parser import get_all_tasks
 from core.models import TaskStatus
 from core.task_writer import append_task_to_section
+from core.rescan import rescan_vault
 from ai.planner import get_planner
 from workflows.carryover import find_todays_note
 
@@ -62,9 +63,12 @@ if todays_note:
             line = f"- [ ] {t.description}"
             if t.due_date:
                 line += f" 📅 {t.due_date.isoformat()}"
+            if t.project_source and t.project_line:
+                line += f" <!-- project:{t.project_source}:{t.project_line} -->"
             append_task_to_section(todays_note.path, "Top 3 Must-Do Today", line)
+        rescan_vault()
         st.success(f"Added top {min(3, len(ranked))} tasks to today's note!")
-        st.info("Re-scan vault to refresh.")
+        st.rerun()
 
 # ── Suggested schedule ─────────────────────────────────────────────────
 

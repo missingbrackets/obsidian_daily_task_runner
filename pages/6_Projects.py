@@ -6,9 +6,8 @@ from datetime import date
 from config import PROJECTS_FOLDER
 from core.models import TaskStatus
 from core.task_parser import get_all_tasks
-from core.task_writer import append_task_to_section, toggle_task
-from core.vault import scan_folder
-from core.task_parser import parse_all
+from core.task_writer import append_task_to_section
+from core.rescan import rescan_vault
 from templates.engine import create_project_note
 
 st.set_page_config(page_title="Projects", page_icon="📁", layout="wide")
@@ -48,8 +47,9 @@ with st.form("new_project_form"):
         path = create_project_note(
             st.session_state.vault_path, PROJECTS_FOLDER, project_title.strip()
         )
+        rescan_vault()
         st.success(f"Created: {path.name}")
-        st.info("Re-scan vault to see the new project.")
+        st.rerun()
 
 st.divider()
 
@@ -85,8 +85,9 @@ if project_notes:
                 line += f" {prio_emoji}"
 
             append_task_to_section(target_project.path, "Next Actions (Only physical, doable steps)", line)
+            rescan_vault()
             st.success(f"Added task to {target_project.path.stem}")
-            st.info("Re-scan vault to refresh.")
+            st.rerun()
 else:
     st.info("No project files found. Create a project first.")
 

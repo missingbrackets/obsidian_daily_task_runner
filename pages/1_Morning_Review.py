@@ -6,6 +6,7 @@ from datetime import date
 from config import DAILY_FOLDER
 from core.task_parser import get_all_tasks
 from core.models import TaskStatus
+from core.rescan import rescan_vault
 from workflows.morning_review import morning_summary
 from workflows.carryover import (
     find_yesterdays_note,
@@ -47,8 +48,9 @@ if not todays_note:
     st.subheader("📝 Create Today's Daily Note")
     if st.button("Create Daily Note", type="primary"):
         path = create_daily_note(st.session_state.vault_path, DAILY_FOLDER)
+        rescan_vault()
         st.success(f"Created: {path.name}")
-        st.info("Re-scan vault to see the new note.")
+        st.rerun()
     st.divider()
 
 # ── Today's tasks ──────────────────────────────────────────────────────
@@ -91,8 +93,9 @@ if summary["yesterday_incomplete"]:
             summary["yesterday_incomplete"],
             todays_note.path,
         )
+        rescan_vault()
         st.success(f"Carried over {count} tasks to today's note.")
-        st.info("Re-scan vault to refresh.")
+        st.rerun()
 else:
     st.info("No incomplete tasks from yesterday.")
 

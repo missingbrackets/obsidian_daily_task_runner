@@ -5,6 +5,7 @@ from datetime import date
 
 from config import DAILY_FOLDER
 from core.task_writer import append_task_to_section
+from core.rescan import rescan_vault
 from workflows.daily_selection import get_candidates, filter_overdue_first
 from workflows.carryover import find_todays_note
 
@@ -68,12 +69,16 @@ if selected_tasks:
                 line = f"- [ ] {t.description}"
                 if t.due_date:
                     line += f" 📅 {t.due_date.isoformat()}"
+                # Propagate project source label for sync
+                if t.project_source and t.project_line:
+                    line += f" <!-- project:{t.project_source}:{t.project_line} -->"
                 append_task_to_section(
                     todays_note.path,
                     "Daily Task List",
                     line,
                 )
+            rescan_vault()
             st.success(f"Added {len(selected_tasks)} tasks to today's note!")
-            st.info("Re-scan vault to refresh.")
+            st.rerun()
     else:
         st.warning("Create today's daily note first (Morning Review page).")

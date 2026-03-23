@@ -23,10 +23,12 @@ _DUE_RE = re.compile(r"📅\s*(\d{4}-\d{2}-\d{2})")
 _SCHEDULED_RE = re.compile(r"⏳\s*(\d{4}-\d{2}-\d{2})")
 _DONE_DATE_RE = re.compile(r"✅\s*(\d{4}-\d{2}-\d{2})")
 _TAG_RE = re.compile(r"#([\w/\-]+)")
+_PROJECT_SRC_RE = re.compile(r"<!--\s*project:(.+?):(\d+)\s*-->")
 
 # Strip metadata markers from description for display
 _META_STRIP_RE = re.compile(
     r"[📅⏳✅🔺⏫🔼🔽⏬]\s*\d{4}-\d{2}-\d{2}|[🔺⏫🔼🔽⏬]|#[\w/\-]+"
+    r"|<!--\s*project:.+?-->"
 )
 
 
@@ -72,6 +74,11 @@ def parse_task_line(line: str, file_path: Path, line_number: int) -> Task | None
     # Tags
     tags = _TAG_RE.findall(body)
 
+    # Project source tracking
+    proj_match = _PROJECT_SRC_RE.search(body)
+    project_source = proj_match.group(1) if proj_match else ""
+    project_line = int(proj_match.group(2)) if proj_match else 0
+
     # Clean description
     description = _META_STRIP_RE.sub("", body).strip()
     description = re.sub(r"\s{2,}", " ", description)
@@ -87,6 +94,8 @@ def parse_task_line(line: str, file_path: Path, line_number: int) -> Task | None
         done_date=done_date,
         priority=priority,
         tags=tags,
+        project_source=project_source,
+        project_line=project_line,
     )
 
 

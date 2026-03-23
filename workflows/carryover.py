@@ -39,6 +39,7 @@ def perform_carryover(
 ) -> int:
     """Write carryover tasks into today's note under the specified section.
 
+    Preserves project source labels so sync continues to work.
     Returns the number of tasks carried over.
     """
     count = 0
@@ -47,11 +48,13 @@ def perform_carryover(
         if task.due_date:
             line += f" 📅 {task.due_date.isoformat()}"
         if task.priority != 3:
-            # Reverse-map priority to emoji
             pmap = {1: "🔺", 2: "⏫", 3: "🔼", 4: "🔽", 5: "⏬"}
             line += f" {pmap.get(task.priority, '')}"
         for tag in task.tags:
             line += f" #{tag}"
+        # Propagate project source label if present
+        if task.project_source and task.project_line:
+            line += f" <!-- project:{task.project_source}:{task.project_line} -->"
 
         append_task_to_section(today_note_path, section, line)
         count += 1
