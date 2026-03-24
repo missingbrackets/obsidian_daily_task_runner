@@ -300,6 +300,33 @@ def sync_due_date(
     return updated
 
 
+# ── Carryover: move task to "Move to tomorrow" and tick it ─────────────
+
+def move_task_to_tomorrow_section(task: Task) -> None:
+    """In yesterday's daily note: tick the task where it is, and add a
+    ticked copy under the 'Move to tomorrow' section.
+
+    This marks the task as handled in yesterday's note so it no longer
+    appears as incomplete.
+    """
+    lines = _read_lines(task.file_path)
+    idx = task.line_number - 1
+    if idx >= len(lines):
+        return
+
+    # 1. Tick the original line
+    lines[idx] = _toggle_line(lines[idx], TaskStatus.DONE)
+    _write_lines(task.file_path, lines)
+
+    # 2. Add a ticked copy under "Move to tomorrow"
+    ticked_line = f"- [x] {task.description}"
+    if task.due_date:
+        ticked_line += f" 📅 {task.due_date.isoformat()}"
+    if task.project_source and task.project_line:
+        ticked_line += f" <!-- project:{task.project_source}:{task.project_line} -->"
+    append_task_to_section(task.file_path, "Move to tomorrow", ticked_line)
+
+
 def _update_due_date_at_line(path: Path, line_number: int, new_date: str) -> None:
     """Update due date on a specific line in a file."""
     lines = _read_lines(path)

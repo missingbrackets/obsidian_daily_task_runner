@@ -1,20 +1,23 @@
-"""Morning Review page – your daily task briefing."""
+"""Morning Review – unified daily task selection.
+
+One page, one flow:
+1. Create today's daily note if needed
+2. Select tasks from: yesterday incomplete -> overdue -> due today -> due soon
+3. Write selected to today's note; yesterday tasks get moved to "Move to tomorrow"
+"""
 
 import streamlit as st
 from datetime import date
 
 from config import DAILY_FOLDER
-from core.task_parser import get_all_tasks
-from core.models import TaskStatus
 from core.rescan import rescan_vault
-from workflows.morning_review import morning_summary
-from workflows.weekly_planning import get_weekly_note_tasks
-from workflows.carryover import (
-    find_yesterdays_note,
-    find_todays_note,
-    get_carryover_tasks,
-    perform_carryover,
+from core.task_writer import (
+    append_task_to_section,
+    move_task_to_tomorrow_section,
 )
+from workflows.daily_selection import daily_selection_groups
+from workflows.carryover import find_todays_note
+from workflows.weekly_planning import get_weekly_note_tasks
 from templates.engine import create_daily_note
 
 st.set_page_config(page_title="Morning Review", page_icon="🌅", layout="wide")
@@ -26,84 +29,150 @@ if not st.session_state.get("notes"):
     st.stop()
 
 notes = st.session_state.notes
-summary = morning_summary(notes, DAILY_FOLDER)
-
-# ── Metrics row ────────────────────────────────────────────────────────
-
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric("Due Today", len(summary["today"]))
-with col2:
-    st.metric("Overdue", len(summary["overdue"]))
-with col3:
-    st.metric("Carryover", len(summary["yesterday_incomplete"]))
-with col4:
-    st.metric("Total Open", summary["total_open"])
-
-st.divider()
 
 # ── Create today's daily note ─────────────────────────────────────────
 
 todays_note = find_todays_note(notes, DAILY_FOLDER)
 if not todays_note:
-    st.subheader("📝 Create Today's Daily Note")
-    if st.button("Create Daily Note", type="primary"):
+    if st.button("📝 Create Today's Daily Note", type="primary"):
         path = create_daily_note(st.session_state.vault_path, DAILY_FOLDER)
         rescan_vault()
         st.success(f"Created: {path.name}")
         st.rerun()
-    st.divider()
+    st.stop()
 
-# ── Today's tasks ──────────────────────────────────────────────────────
+# ── Gather all candidate groups ───────────────────────────────────────
 
-st.subheader(f"📌 Tasks Due Today ({len(summary['today'])})")
-if summary["today"]:
-    for t in summary["today"]:
-        prio = "🔺" if t.priority <= 2 else ""
-        st.checkbox(
-            f"{prio} {t.description}",
-            value=False,
-            key=f"today_{t.file_path}_{t.line_number}",
-            help=f"From: {t.file_path.name} | Section: {t.section}",
-        )
-else:
-    st.info("No tasks specifically due today.")
+groups = daily_selection_groups(notes)
 
-# ── Overdue tasks ──────────────────────────────────────────────────────
+total = (
+    len(groups["yesterday_incomplete"])
+    + len(groups["overdue"])
+    + len(groups["due_today"])
+    + len(groups["due_soon"])
+)
 
-st.subheader(f"🔴 Overdue Tasks ({len(summary['overdue'])})")
-if summary["overdue"]:
-    for t in summary["overdue"]:
-        days = (date.today() - t.due_date).days if t.due_date else 0
-        st.markdown(
-            f"- **{t.description}** – {days}d overdue (due {t.due_date}) "
-            f"*[{t.file_path.name}]*"
-        )
-else:
-    st.success("No overdue tasks!")
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("Yesterday", len(groups["yesterday_incomplete"]))
+with col2:
+    st.metric("Overdue", len(groups["overdue"]))
+with col3:
+    st.metric("Due Today", len(groups["due_today"]))
+with col4:
+    st.metric("Due Soon", len(groups["due_soon"]))
 
-# ── Carryover ──────────────────────────────────────────────────────────
-
-st.subheader(f"📥 Carryover from Yesterday ({len(summary['yesterday_incomplete'])})")
-if summary["yesterday_incomplete"]:
-    for t in summary["yesterday_incomplete"]:
-        st.markdown(f"- {t.description}")
-
-    if todays_note and st.button("📋 Copy Carryover to Today's Note"):
-        count = perform_carryover(
-            summary["yesterday_incomplete"],
-            todays_note.path,
-        )
-        rescan_vault()
-        st.success(f"Carried over {count} tasks to today's note.")
-        st.rerun()
-else:
-    st.info("No incomplete tasks from yesterday.")
-
-# ── This week's tasks by category ─────────────────────────────────────
+if total == 0:
+    st.success("No tasks to review! Go to **Weekly Planning** to set up your week.")
+    st.stop()
 
 st.divider()
-st.subheader("📋 This Week's Tasks (from Weekly Note)")
+st.markdown("Select tasks to add to today's daily note, then click the button at the bottom.")
+
+# ── Track selections ──────────────────────────────────────────────────
+
+selected_yesterday: list = []
+selected_project: list = []
+
+
+def _task_key(t) -> str:
+    return f"{t.file_path.stem}_{t.line_number}"
+
+
+def _prio_icon(t) -> str:
+    return {1: "🔺", 2: "⏫", 3: "", 4: "🔽", 5: "⏬"}.get(t.priority, "")
+
+
+# ── 1. Yesterday incomplete ───────────────────────────────────────────
+
+if groups["yesterday_incomplete"]:
+    st.subheader(f"📥 Not Completed Yesterday ({len(groups['yesterday_incomplete'])})")
+    st.caption("Selecting these will tick them off in yesterday's note and move them to 'Move to tomorrow'.")
+    for t in groups["yesterday_incomplete"]:
+        due_str = f" 📅 {t.due_date}" if t.due_date else ""
+        label = f"🟠 {_prio_icon(t)} {t.description}{due_str}"
+        if st.checkbox(label, key=f"yest_{_task_key(t)}"):
+            selected_yesterday.append(t)
+
+# ── 2. Overdue from projects ─────────────────────────────────────────
+
+if groups["overdue"]:
+    st.divider()
+    st.subheader(f"🔴 Overdue Project Tasks ({len(groups['overdue'])})")
+    for project, tasks in groups["overdue_by_project"].items():
+        st.markdown(f"**{project}**")
+        for t in tasks:
+            days = (date.today() - t.due_date).days if t.due_date else 0
+            label = f"🔴 {_prio_icon(t)} {t.description} ({days}d overdue)"
+            if st.checkbox(label, key=f"over_{_task_key(t)}"):
+                selected_project.append(t)
+
+# ── 3. Due today ──────────────────────────────────────────────────────
+
+if groups["due_today"]:
+    st.divider()
+    st.subheader(f"🟡 Due Today ({len(groups['due_today'])})")
+    for project, tasks in groups["due_today_by_project"].items():
+        st.markdown(f"**{project}**")
+        for t in tasks:
+            label = f"🟡 {_prio_icon(t)} {t.description}"
+            if st.checkbox(label, key=f"today_{_task_key(t)}"):
+                selected_project.append(t)
+
+# ── 4. Due soon ───────────────────────────────────────────────────────
+
+if groups["due_soon"]:
+    st.divider()
+    st.subheader(f"📅 Due Soon ({len(groups['due_soon'])})")
+    for project, tasks in groups["due_soon_by_project"].items():
+        st.markdown(f"**{project}**")
+        for t in tasks:
+            days_until = (t.due_date - date.today()).days if t.due_date else 0
+            label = f"⚪ {_prio_icon(t)} {t.description} (in {days_until}d, {t.due_date})"
+            if st.checkbox(label, key=f"soon_{_task_key(t)}"):
+                selected_project.append(t)
+
+# ── Write selected to daily note ──────────────────────────────────────
+
+all_selected = selected_yesterday + selected_project
+
+st.divider()
+if all_selected:
+    st.subheader(f"📝 Selected: {len(all_selected)} tasks")
+    for t in all_selected:
+        st.markdown(f"- {t.description}")
+
+    if st.button("📋 Add Selected to Today's Daily Note", type="primary"):
+        for t in selected_yesterday:
+            # Tick in yesterday's note + move to "Move to tomorrow"
+            move_task_to_tomorrow_section(t)
+            # Add fresh copy to today's daily task list
+            line = f"- [ ] {t.description}"
+            if t.due_date:
+                line += f" 📅 {t.due_date.isoformat()}"
+            if t.project_source and t.project_line:
+                line += f" <!-- project:{t.project_source}:{t.project_line} -->"
+            append_task_to_section(todays_note.path, "Daily Task List", line)
+
+        for t in selected_project:
+            line = f"- [ ] {t.description}"
+            if t.due_date:
+                line += f" 📅 {t.due_date.isoformat()}"
+            # Build project source from the project task itself
+            from core.task_writer import build_project_source_comment
+            line += f" {build_project_source_comment(t, st.session_state.vault_path)}"
+            append_task_to_section(todays_note.path, "Daily Task List", line)
+
+        rescan_vault()
+        st.success(f"Added {len(all_selected)} tasks to today's note!")
+        st.rerun()
+else:
+    st.info("Select tasks above to add to today's daily note.")
+
+# ── This week's tasks (from weekly note) ──────────────────────────────
+
+st.divider()
+st.subheader("📋 This Week (from Weekly Note)")
 
 weekly_tasks = get_weekly_note_tasks(notes)
 if weekly_tasks:
@@ -112,10 +181,10 @@ if weekly_tasks:
         by_section.setdefault(t.section, []).append(t)
 
     for section, tasks in by_section.items():
-        with st.expander(f"**{section}** ({len(tasks)} tasks)", expanded=True):
+        with st.expander(f"**{section}** ({len(tasks)} tasks)"):
             for t in sorted(tasks, key=lambda x: x.priority):
                 status_icon = "🔴" if t.is_overdue else ("🟡" if t.is_due_today else "⚪")
                 due = f" 📅 {t.due_date}" if t.due_date else ""
                 st.markdown(f"{status_icon} {t.description}{due}")
 else:
-    st.info("No tasks in this week's weekly note yet. Go to **Weekly Planning** to set up your week.")
+    st.info("No tasks in this week's weekly note. Go to **Weekly Planning** to set up your week.")

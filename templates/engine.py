@@ -14,19 +14,14 @@ from string import Template
 
 DAILY_TEMPLATE = """\
 ## 🔥 Top 3 Must-Do Today
-- [ ]
-- [ ]
-- [ ]
 
 ---
 
 ## ✅ Daily Task List
-- [ ]
 
 ---
 
 ## 📥 Carryover From Yesterday
-- [ ]
 
 ---
 
@@ -35,7 +30,6 @@ DAILY_TEMPLATE = """\
 ---
 
 ## 🧠 Notes / Brain Dump
--
 
 ---
 
@@ -44,7 +38,6 @@ DAILY_TEMPLATE = """\
 -
 
 **Move to tomorrow:**
-- [ ]
 
 ## Case Pricings
 ```tasks
@@ -79,20 +72,13 @@ WEEKLY_TEMPLATE = """\
 ## 📋 Master Task List (This Week)
 
 ### 🧑‍💻 Work
-- [ ]
-- [ ]
 
 ### 🏠 Life Admin
-- [ ]
-- [ ]
 
 ### 💪 Health
-- [ ]
-- [ ]
 
 ### 🌱 Personal / Growth
-- [ ]
-- [ ]
+
 
 ---
 
@@ -152,17 +138,13 @@ What does "finished" look like?
 
 ## 🪜 Next Actions (Only physical, doable steps)
 
-- [ ]
-
 ---
 
 ## 📅 Waiting / Blocked
--
 
 ---
 
 ## ✅ Completed
-- [ ]
 """
 
 CASE_PRICING_TEMPLATE = """\
@@ -380,8 +362,6 @@ If lost:
 
 (Only physical, doable steps)
 
-- [ ]
-
 ---
 
 ## 📅 Waiting / Blocked
@@ -389,8 +369,6 @@ If lost:
 ---
 
 ## ✅ Completed
-
-- [ ]
 """
 
 
