@@ -7,18 +7,20 @@ from __future__ import annotations
 
 from datetime import date
 
-from config import PROJECTS_FOLDER
+from config import PROJECTS_FOLDER, CASE_PRICING_FOLDER
 from core.models import NoteFile, Task, TaskStatus
 from core.task_parser import get_all_tasks
 
+_SOURCE_FOLDERS = (PROJECTS_FOLDER, CASE_PRICING_FOLDER)
+
 
 def get_overdue_tasks(notes: list[NoteFile]) -> list[Task]:
-    """Open project tasks past their due date."""
+    """Open project/case-pricing tasks past their due date."""
     today = date.today()
     return sorted(
         [
             t for t in get_all_tasks(notes)
-            if t.source_folder == PROJECTS_FOLDER
+            if t.source_folder in _SOURCE_FOLDERS
             and t.status == TaskStatus.OPEN
             and t.due_date is not None
             and t.due_date < today

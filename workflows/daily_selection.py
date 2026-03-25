@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from config import PROJECTS_FOLDER, DAILY_FOLDER
+from config import PROJECTS_FOLDER, DAILY_FOLDER, CASE_PRICING_FOLDER
 from core.models import NoteFile, Task, TaskStatus
 from core.task_parser import get_all_tasks
 from workflows.weekly_planning import get_weekly_note_tasks
@@ -40,13 +40,16 @@ def get_yesterday_incomplete(notes: list[NoteFile]) -> list[Task]:
     return tasks
 
 
+_SOURCE_FOLDERS = (PROJECTS_FOLDER, CASE_PRICING_FOLDER)
+
+
 def get_overdue_project_tasks(notes: list[NoteFile]) -> list[Task]:
-    """Open project tasks past their due date."""
+    """Open project/case-pricing tasks past their due date."""
     today = date.today()
     return sorted(
         [
             t for t in get_all_tasks(notes)
-            if t.source_folder == PROJECTS_FOLDER
+            if t.source_folder in _SOURCE_FOLDERS
             and t.status == TaskStatus.OPEN
             and t.due_date is not None
             and t.due_date < today
@@ -56,30 +59,39 @@ def get_overdue_project_tasks(notes: list[NoteFile]) -> list[Task]:
 
 
 def get_due_today_project_tasks(notes: list[NoteFile]) -> list[Task]:
-    """Open project tasks due today."""
+    """Open project/case-pricing tasks due today."""
     today = date.today()
     return [
         t for t in get_all_tasks(notes)
-        if t.source_folder == PROJECTS_FOLDER
+        if t.source_folder in _SOURCE_FOLDERS
         and t.status == TaskStatus.OPEN
         and t.due_date == today
     ]
 
 
 def get_due_soon_project_tasks(notes: list[NoteFile]) -> list[Task]:
-    """Open project tasks due in the next 7 days (excluding today and overdue)."""
+    """Open project/case-pricing tasks due in the next 7 days (excluding today and overdue)."""
     today = date.today()
     soon = today + timedelta(days=7)
     return sorted(
         [
             t for t in get_all_tasks(notes)
-            if t.source_folder == PROJECTS_FOLDER
+            if t.source_folder in _SOURCE_FOLDERS
             and t.status == TaskStatus.OPEN
             and t.due_date is not None
             and today < t.due_date <= soon
         ],
         key=lambda t: (t.due_date, t.priority),
     )
+
+
+def get_case_pricing_tasks(notes: list[NoteFile]) -> list[Task]:
+    """Open tasks from the Case Pricing folder."""
+    return [
+        t for t in get_all_tasks(notes)
+        if t.source_folder == CASE_PRICING_FOLDER
+        and t.status == TaskStatus.OPEN
+    ]
 
 
 def get_weekly_note_open_tasks(notes: list[NoteFile]) -> list[Task]:
@@ -93,6 +105,7 @@ def daily_selection_groups(notes: list[NoteFile]) -> dict:
     overdue = get_overdue_project_tasks(notes)
     due_today = get_due_today_project_tasks(notes)
     due_soon = get_due_soon_project_tasks(notes)
+    case_pricing = get_case_pricing_tasks(notes)
 
     return {
         "yesterday_incomplete": yesterday,
@@ -102,4 +115,6 @@ def daily_selection_groups(notes: list[NoteFile]) -> dict:
         "due_today_by_project": _group_by_project(due_today),
         "due_soon": due_soon,
         "due_soon_by_project": _group_by_project(due_soon),
+        "case_pricing": case_pricing,
+        "case_pricing_by_project": _group_by_project(case_pricing),
     }

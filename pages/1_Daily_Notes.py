@@ -1,17 +1,18 @@
 """Daily Notes – unified daily workflow.
 
 One page, one flow:
-1. Create today's daily note if needed
+1. Auto-create today's daily note if needed
 2. AI-recommended Top 3 tasks
 3. Triage: yesterday incomplete + overdue (bring forward / reschedule / cancel)
-4. Select from due-today and due-soon tasks
-5. Write all selections to today's daily note
+4. Case Pricing tasks
+5. Select from due-today and due-soon tasks
+6. Write all selections to today's daily note
 """
 
 import streamlit as st
 from datetime import date
 
-from config import DAILY_FOLDER
+from config import DAILY_FOLDER, CASE_PRICING_FOLDER
 from core.models import TaskStatus
 from core.rescan import rescan_vault
 from core.task_parser import get_all_tasks
@@ -38,16 +39,32 @@ if not st.session_state.get("notes"):
 
 notes = st.session_state.notes
 
-# ── Create today's daily note ─────────────────────────────────────────
+# ── Section heading constants (must match templates/engine.py exactly) ─
+
+SECTION_TOP3 = "🔥 Top 3 Must-Do Today"
+SECTION_DAILY_TASKS = "✅ Daily Task List"
+SECTION_CARRYOVER = "📥 Carryover From Yesterday"
+SECTION_CASE_PRICINGS = "Case Pricings"
+
+
+# ── Ensure today's daily note exists ──────────────────────────────────
+
+def _ensure_todays_note():
+    """Find or create today's daily note. Always returns a NoteFile."""
+    todays = find_todays_note(notes, DAILY_FOLDER)
+    if todays:
+        return todays
+    # Auto-create
+    create_daily_note(st.session_state.vault_path, DAILY_FOLDER)
+    rescan_vault()
+    # Re-fetch after rescan
+    refreshed = st.session_state.notes
+    return find_todays_note(refreshed, DAILY_FOLDER)
+
 
 todays_note = find_todays_note(notes, DAILY_FOLDER)
 if not todays_note:
-    if st.button("📝 Create Today's Daily Note", type="primary"):
-        path = create_daily_note(st.session_state.vault_path, DAILY_FOLDER)
-        rescan_vault()
-        st.success(f"Created: {path.name}")
-        st.rerun()
-    st.stop()
+    st.info("No daily note for today yet — it will be created automatically when you add tasks.")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -60,6 +77,10 @@ def _prio_icon(t) -> str:
     return {1: "🔺", 2: "⏫", 3: "", 4: "🔽", 5: "⏬"}.get(t.priority, "")
 
 
+def _is_case_pricing(t) -> bool:
+    return t.source_folder == CASE_PRICING_FOLDER
+
+
 def _build_task_line(t) -> str:
     """Build the markdown line to write into the daily note."""
     line = f"- [ ] {t.description}"
@@ -68,7 +89,9 @@ def _build_task_line(t) -> str:
     if t.project_source and t.project_line:
         line += f" <!-- project:{t.project_source}:{t.project_line} -->"
     else:
-        line += f" {build_project_source_comment(t, st.session_state.vault_path)}"
+        comment = build_project_source_comment(t, st.session_state.vault_path)
+        if comment.strip():
+            line += f" {comment}"
     return line
 
 
@@ -77,6 +100,10 @@ def _build_task_line(t) -> str:
 groups = daily_selection_groups(notes)
 all_open = [t for t in get_all_tasks(notes) if t.status == TaskStatus.OPEN]
 planner = get_planner(use_llm=False)
+
+# Initialise bring_forward tracking
+if "bring_forward" not in st.session_state:
+    st.session_state.bring_forward = set()
 
 # ═══════════════════════════════════════════════════════════════════════
 # SECTION 1: AI SMART SUMMARY
@@ -92,16 +119,17 @@ if top_tasks:
     for i, t in enumerate(top_tasks, 1):
         status_icon = "🔴" if t.is_overdue else ("🟡" if t.is_due_today else "🟢")
         due_str = f" · due {t.due_date}" if t.due_date else ""
+        source = "Case Pricing" if _is_case_pricing(t) else t.file_path.stem
         st.markdown(
             f"**{i}.** {status_icon} {_prio_icon(t)} {t.description}{due_str}  \n"
-            f"&nbsp;&nbsp;&nbsp;&nbsp;*{t.file_path.stem}*"
+            f"&nbsp;&nbsp;&nbsp;&nbsp;*{source}*"
         )
 
     if st.button("⚡ Write Top 3 to Today's Note", key="write_top3"):
+        note = _ensure_todays_note()
         for t in top_tasks[:3]:
-            append_task_to_section(
-                todays_note.path, "Top 3 Must-Do Today", _build_task_line(t)
-            )
+            section = SECTION_CASE_PRICINGS if _is_case_pricing(t) else SECTION_TOP3
+            append_task_to_section(note.path, section, _build_task_line(t))
         rescan_vault()
         st.success("Top 3 written to today's note!")
         st.rerun()
@@ -124,10 +152,6 @@ if triage_tasks:
         "These tasks are overdue or weren't completed yesterday. "
         "Decide: bring forward, reschedule, or remove."
     )
-
-    # Track tasks selected to bring forward
-    if "bring_forward" not in st.session_state:
-        st.session_state.bring_forward = set()
 
     # -- Yesterday incomplete --
     if yesterday_tasks:
@@ -166,9 +190,9 @@ if triage_tasks:
                     st.toast(f"Cancelled. Synced: {', '.join(updated)}")
                     st.rerun()
 
-    # -- Overdue from projects --
+    # -- Overdue from projects/case pricing --
     if overdue_tasks:
-        st.markdown("#### 🔴 Overdue from Projects")
+        st.markdown("#### 🔴 Overdue from Projects / Case Pricing")
         for project, tasks in groups["overdue_by_project"].items():
             st.markdown(f"**{project}**")
             for t in tasks:
@@ -220,7 +244,33 @@ if triage_tasks:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# SECTION 3: TODAY'S TASK SELECTION (due today → due soon)
+# SECTION 3: CASE PRICING TASKS
+# ═══════════════════════════════════════════════════════════════════════
+
+case_pricing_tasks = groups.get("case_pricing", [])
+# Exclude any already shown in overdue triage
+overdue_keys = {_task_key(t) for t in overdue_tasks}
+case_pricing_fresh = [t for t in case_pricing_tasks if _task_key(t) not in overdue_keys]
+
+selected_case_pricing: list = []
+
+if case_pricing_fresh:
+    st.divider()
+    st.subheader(f"💼 Case Pricing ({len(case_pricing_fresh)})")
+    for project, tasks in groups.get("case_pricing_by_project", {}).items():
+        fresh = [t for t in tasks if _task_key(t) not in overdue_keys]
+        if not fresh:
+            continue
+        st.markdown(f"**{project}**")
+        for t in sorted(fresh, key=lambda x: (x.due_date or date.max, x.priority)):
+            due_str = f" (due {t.due_date})" if t.due_date else ""
+            label = f"💼 {_prio_icon(t)} {t.description}{due_str}"
+            if st.checkbox(label, key=f"cp_{_task_key(t)}"):
+                selected_case_pricing.append(t)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# SECTION 4: TODAY'S TASK SELECTION (due today -> due soon)
 # ═══════════════════════════════════════════════════════════════════════
 
 due_today = groups["due_today"]
@@ -256,7 +306,7 @@ if due_soon:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# SECTION 4: COMMIT – Write selections to today's daily note
+# SECTION 5: COMMIT – Write selections to today's daily note
 # ═══════════════════════════════════════════════════════════════════════
 
 # Gather all "bring forward" tasks from triage
@@ -269,7 +319,13 @@ bring_forward_overdue = [
     if f"o_{_task_key(t)}" in st.session_state.get("bring_forward", set())
 ]
 
-all_to_add = bring_forward_yesterday + bring_forward_overdue + selected_today + selected_soon
+all_to_add = (
+    bring_forward_yesterday
+    + bring_forward_overdue
+    + selected_case_pricing
+    + selected_today
+    + selected_soon
+)
 
 st.divider()
 if all_to_add:
@@ -284,32 +340,41 @@ if all_to_add:
         )
 
     for t in all_to_add:
-        status = "🟠" if t in bring_forward_yesterday else (
-            "🔴" if t in bring_forward_overdue else (
-                "🟡" if t.is_due_today else "⚪"
-            )
-        )
+        if _is_case_pricing(t):
+            status = "💼"
+        elif t in bring_forward_yesterday:
+            status = "🟠"
+        elif t in bring_forward_overdue:
+            status = "🔴"
+        elif t.is_due_today:
+            status = "🟡"
+        else:
+            status = "⚪"
         st.markdown(f"- {status} {t.description}")
 
     if st.button("📋 Add All to Today's Daily Note", type="primary"):
+        # Auto-create today's note if it doesn't exist yet
+        note = _ensure_todays_note()
+
         # 1. Handle yesterday carryovers (tick + move to tomorrow in yesterday's note)
         for t in bring_forward_yesterday:
             move_task_to_tomorrow_section(t)
-            append_task_to_section(
-                todays_note.path, "Daily Task List", _build_task_line(t)
-            )
+            section = SECTION_CASE_PRICINGS if _is_case_pricing(t) else SECTION_DAILY_TASKS
+            append_task_to_section(note.path, section, _build_task_line(t))
 
         # 2. Handle overdue brought forward
         for t in bring_forward_overdue:
-            append_task_to_section(
-                todays_note.path, "Daily Task List", _build_task_line(t)
-            )
+            section = SECTION_CASE_PRICINGS if _is_case_pricing(t) else SECTION_DAILY_TASKS
+            append_task_to_section(note.path, section, _build_task_line(t))
 
-        # 3. Handle due-today and due-soon selections
+        # 3. Handle case pricing selections
+        for t in selected_case_pricing:
+            append_task_to_section(note.path, SECTION_CASE_PRICINGS, _build_task_line(t))
+
+        # 4. Handle due-today and due-soon selections
         for t in selected_today + selected_soon:
-            append_task_to_section(
-                todays_note.path, "Daily Task List", _build_task_line(t)
-            )
+            section = SECTION_CASE_PRICINGS if _is_case_pricing(t) else SECTION_DAILY_TASKS
+            append_task_to_section(note.path, section, _build_task_line(t))
 
         # Clear the bring_forward state
         st.session_state.bring_forward = set()
@@ -322,7 +387,7 @@ else:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# SECTION 5: WEEKLY OVERVIEW (read-only reference)
+# SECTION 6: WEEKLY OVERVIEW (read-only reference)
 # ═══════════════════════════════════════════════════════════════════════
 
 st.divider()

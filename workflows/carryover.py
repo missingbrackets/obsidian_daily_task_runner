@@ -35,7 +35,7 @@ def get_carryover_tasks(yesterday_note: NoteFile) -> list[Task]:
 def perform_carryover(
     carryover_tasks: list[Task],
     today_note_path: Path,
-    section: str = "Carryover From Yesterday",
+    section: str = "📥 Carryover From Yesterday",
 ) -> int:
     """Write carryover tasks into today's note under the specified section.
 
