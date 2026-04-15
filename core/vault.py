@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from config import SCAN_FOLDERS
+from config import SCAN_FOLDERS, EXCLUDE_FOLDERS
 from core.models import NoteFile
 
 
@@ -26,6 +26,9 @@ def scan_vault(vault_path: str, folders: list[str] | None = None) -> list[NoteFi
             continue
         for md_file in sorted(folder_path.rglob("*.md")):
             rel = str(md_file.relative_to(vault))
+            # Skip if the file matches any excluded folder path
+            if any(excl in md_file.as_posix() for excl in EXCLUDE_FOLDERS):
+                continue
             notes.append(NoteFile(path=md_file, relative_path=rel, folder=folder))
 
     return notes

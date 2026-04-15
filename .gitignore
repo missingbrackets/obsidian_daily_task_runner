@@ -1,6 +1,13 @@
+# Python virtual environments
+venv/
+env/
+.venv/
+
+# Python cache files
 __pycache__/
 *.py[cod]
-.venv/
-*.bak
-.streamlit/
-.env
+*$py.class
+
+# IDE files
+.vscode/
+.idea/

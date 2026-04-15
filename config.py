@@ -15,6 +15,10 @@ SCAN_FOLDERS = [
     "To Do/06 Case Pricing",
 ]
 
+EXCLUDE_FOLDERS = [
+    "To Do/03 Projects/Completed",
+]
+
 DAILY_FOLDER = "To Do/01 Daily"
 WEEKLY_FOLDER = "To Do/02 Weekly"
 PROJECTS_FOLDER = "To Do/03 Projects"

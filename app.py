@@ -7,7 +7,7 @@ A local-first task management dashboard that works with your Obsidian vault.
 import streamlit as st
 from pathlib import Path
 
-from config import DEFAULT_VAULT_PATH, SCAN_FOLDERS, DAILY_FOLDER
+from config import DEFAULT_VAULT_PATH, SCAN_FOLDERS, DAILY_FOLDER, EXCLUDE_FOLDERS
 from core.vault import scan_vault, get_vault_path
 from core.task_parser import parse_all, get_all_tasks
 from core.models import TaskStatus
@@ -96,6 +96,11 @@ The app scans these folders in your vault:
 """)
     for f in SCAN_FOLDERS:
         st.markdown(f"- `{f}`")
+        
+    if EXCLUDE_FOLDERS:
+        st.markdown("### Excluded Folders\n\nThe app ignores these folders:")
+        for f in EXCLUDE_FOLDERS:
+            st.markdown(f"- `{f}`")
 
 else:
     # Dashboard overview
