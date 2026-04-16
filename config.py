@@ -13,6 +13,7 @@ SCAN_FOLDERS = [
     "To Do/02 Weekly",
     "To Do/03 Projects",
     "To Do/06 Case Pricing",
+    "To Do/07 Direct Reports",
 ]
 
 EXCLUDE_FOLDERS = [
@@ -23,6 +24,7 @@ DAILY_FOLDER = "To Do/01 Daily"
 WEEKLY_FOLDER = "To Do/02 Weekly"
 PROJECTS_FOLDER = "To Do/03 Projects"
 CASE_PRICING_FOLDER = "To Do/06 Case Pricing"
+DIRECT_REPORTS_FOLDER = "To Do/07 Direct Reports"
 
 DATE_FORMAT = "%Y-%m-%d"
 DAILY_NOTE_PREFIX = ""  # e.g. "Daily - " if you prefix daily notes

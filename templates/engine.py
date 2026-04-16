@@ -123,6 +123,16 @@ sort by due
 ```
 """
 
+DIRECT_REPORT_DAILY_TEMPLATE = """\
+# {name} — {date_str}
+
+## ✅ Tasks / To Delegate
+
+## 💬 1:1 Talking Points
+
+## 🗒️ Notes
+"""
+
 PROJECT_TEMPLATE = """\
 # {title}
 
@@ -405,6 +415,36 @@ def create_weekly_note(vault_path: str, weekly_folder: str, target_date: date | 
         return filepath
 
     content = WEEKLY_TEMPLATE.format(week_date=monday.strftime("%Y-%m-%d"))
+    filepath.write_text(content, encoding="utf-8")
+    return filepath
+
+
+def create_direct_report_note(
+    vault_path: str,
+    direct_reports_folder: str,
+    name: str,
+    target_date: date | None = None,
+) -> Path:
+    """Create today's note for a direct report. Returns the path to the file.
+
+    Files live at {vault}/{direct_reports_folder}/{name}/{YYYY-MM-DD}.md.
+    Never overwrites an existing note.
+    """
+    target_date = target_date or date.today()
+    vault = Path(vault_path)
+    folder = vault / direct_reports_folder / name
+    folder.mkdir(parents=True, exist_ok=True)
+
+    filename = f"{target_date.strftime('%Y-%m-%d')}.md"
+    filepath = folder / filename
+
+    if filepath.exists():
+        return filepath
+
+    content = DIRECT_REPORT_DAILY_TEMPLATE.format(
+        name=name,
+        date_str=target_date.strftime("%Y-%m-%d"),
+    )
     filepath.write_text(content, encoding="utf-8")
     return filepath
 
