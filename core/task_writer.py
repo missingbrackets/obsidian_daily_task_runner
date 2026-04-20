@@ -80,14 +80,15 @@ def sync_task_status(
             _toggle_line_in_file(proj_path, task.project_line, new_status)
             updated.append(proj_path.name)
 
-    # 3. If this task lives in a project file, find matching tasks in weekly/daily
-    #    notes by scanning for the project source comment pointing at this file+line.
-    from config import WEEKLY_FOLDER, DAILY_FOLDER
+    # 3. If this task lives in a project file, find matching tasks in weekly/daily/
+    #    direct-report notes by scanning for the project source comment pointing at
+    #    this file+line.
+    from config import WEEKLY_FOLDER, DAILY_FOLDER, DIRECT_REPORTS_FOLDER
     source_rel = str(task.file_path.relative_to(vault)) if _is_under(task.file_path, vault) else ""
 
     if source_rel:
         pattern = f"<!-- project:{source_rel}:{task.line_number} -->"
-        for folder in (WEEKLY_FOLDER, DAILY_FOLDER):
+        for folder in (WEEKLY_FOLDER, DAILY_FOLDER, DIRECT_REPORTS_FOLDER):
             folder_path = vault / folder
             if not folder_path.is_dir():
                 continue
@@ -100,11 +101,11 @@ def sync_task_status(
                     _write_lines(md_file, lines)
                     updated.append(md_file.name)
 
-    # 4. If this task lives in a weekly/daily note and has a project source,
-    #    also look for copies of this task in other downstream notes (daily from weekly)
+    # 4. If this task lives in a weekly/daily/direct-report note and has a project
+    #    source, also find sibling copies in other downstream notes.
     if task.project_source and task.project_line:
         pattern = f"<!-- project:{task.project_source}:{task.project_line} -->"
-        for folder in (WEEKLY_FOLDER, DAILY_FOLDER):
+        for folder in (WEEKLY_FOLDER, DAILY_FOLDER, DIRECT_REPORTS_FOLDER):
             folder_path = vault / folder
             if not folder_path.is_dir():
                 continue
@@ -271,12 +272,13 @@ def sync_due_date(
             _update_due_date_at_line(proj_path, task.project_line, new_date)
             updated.append(proj_path.name)
 
-    # 3. If this task lives in a project file, update downstream copies
+    # 3. If this task lives in a project file, update downstream copies in all
+    #    downstream folders (weekly, daily, direct reports).
     source_rel = str(task.file_path.relative_to(vault)) if _is_under(task.file_path, vault) else ""
     if source_rel:
         pattern = f"<!-- project:{source_rel}:{task.line_number} -->"
-        from config import WEEKLY_FOLDER, DAILY_FOLDER
-        for folder in (WEEKLY_FOLDER, DAILY_FOLDER):
+        from config import WEEKLY_FOLDER, DAILY_FOLDER, DIRECT_REPORTS_FOLDER
+        for folder in (WEEKLY_FOLDER, DAILY_FOLDER, DIRECT_REPORTS_FOLDER):
             folder_path = vault / folder
             if not folder_path.is_dir():
                 continue
@@ -287,11 +289,11 @@ def sync_due_date(
                         _update_due_date_at_line(md_file, line_num, new_date)
                     updated.append(md_file.name)
 
-    # 4. Update sibling copies (weekly/daily) sharing the same project source
+    # 4. Update sibling copies sharing the same project source.
     if task.project_source and task.project_line:
         pattern = f"<!-- project:{task.project_source}:{task.project_line} -->"
-        from config import WEEKLY_FOLDER, DAILY_FOLDER
-        for folder in (WEEKLY_FOLDER, DAILY_FOLDER):
+        from config import WEEKLY_FOLDER, DAILY_FOLDER, DIRECT_REPORTS_FOLDER
+        for folder in (WEEKLY_FOLDER, DAILY_FOLDER, DIRECT_REPORTS_FOLDER):
             folder_path = vault / folder
             if not folder_path.is_dir():
                 continue
