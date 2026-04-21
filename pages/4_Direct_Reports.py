@@ -149,22 +149,24 @@ else:
         by_source.setdefault(t.file_path.stem, []).append(t)
 
     with st.form(f"assign_form_{selected}"):
-        for source, tasks in by_source.items():
-            folder_label = "📂 Projects" if tasks[0].source_folder == PROJECTS_FOLDER else "📅 Weekly"
-            st.markdown(f"**{folder_label} — {source}**")
-            for t in tasks:
-                due_str = f" · due {t.due_date}" if t.due_date else ""
-                overdue_badge = " 🔴" if t.is_overdue else (" 🟡" if t.is_due_today else "")
-                label = f"{overdue_badge} {_prio_icon(t)} {t.description}{due_str}".strip()
-                st.checkbox(label, key=f"assign_{_task_key(t)}")
+        current_source = None
+        for i, t in enumerate(assignable):
+            if t.file_path.stem != current_source:
+                current_source = t.file_path.stem
+                folder_label = "📂 Projects" if t.source_folder == PROJECTS_FOLDER else "📅 Weekly"
+                st.markdown(f"**{folder_label} — {current_source}**")
+            due_str = f" · due {t.due_date}" if t.due_date else ""
+            overdue_badge = " 🔴" if t.is_overdue else (" 🟡" if t.is_due_today else "")
+            label = f"{overdue_badge} {_prio_icon(t)} {t.description}{due_str}".strip()
+            st.checkbox(label, key=f"assign_{i}")
 
         submitted = st.form_submit_button(
             f"📋 Assign selected to {selected}'s plan for today", type="primary"
         )
         if submitted:
             to_assign = [
-                t for t in assignable
-                if st.session_state.get(f"assign_{_task_key(t)}", False)
+                t for i, t in enumerate(assignable)
+                if st.session_state.get(f"assign_{i}", False)
             ]
             if not to_assign:
                 st.warning("No tasks selected.")

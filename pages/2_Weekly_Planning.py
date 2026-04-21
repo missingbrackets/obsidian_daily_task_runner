@@ -78,10 +78,10 @@ if all_pullable and weekly_note:
     with st.form("pull_tasks_form"):
         assignments: dict[str, list] = {cat: [] for cat in WEEKLY_CATEGORIES}
 
-        for t in summary["this_week_by_priority"]:
+        for i, t in enumerate(summary["this_week_by_priority"]):
             status_icon = "🔴" if t.is_overdue else "⚪"
             due_str = f" (due {t.due_date})" if t.due_date else ""
-            task_key = f"{t.file_path.stem}_{t.line_number}"
+            task_key = f"{t.file_path.stem}_{t.line_number}_{i}"
 
             col1, col2 = st.columns([0.6, 0.4])
             with col1:
@@ -105,8 +105,8 @@ if all_pullable and weekly_note:
         if submitted:
             # Build assignments from form state
             task_assignments: dict[str, list] = {cat: [] for cat in WEEKLY_CATEGORIES}
-            for t in summary["this_week_by_priority"]:
-                task_key = f"{t.file_path.stem}_{t.line_number}"
+            for i, t in enumerate(summary["this_week_by_priority"]):
+                task_key = f"{t.file_path.stem}_{t.line_number}_{i}"
                 cat = st.session_state.get(f"cat_{task_key}", WEEKLY_CATEGORIES[0])
                 task_assignments[cat].append(t)
 
