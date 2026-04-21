@@ -82,6 +82,10 @@ def _is_already_pulled(t) -> bool:
     return (rel, t.line_number) in already_pulled
 
 
+due_this_week_or_overdue = set(
+    id(t) for t in summary["project_tasks_overdue"] + summary["project_tasks_this_week"]
+)
+
 all_project_tasks = (
     summary["project_tasks_overdue"]
     + summary["project_tasks_this_week"]
@@ -113,11 +117,19 @@ if pullable and weekly_note:
                     "🟡" if t.is_due_today else "⚪"
                 )
                 due_str = f" (due {t.due_date})" if t.due_date else ""
+                default_on = id(t) in due_this_week_or_overdue
 
-                col1, col2 = st.columns([0.6, 0.4])
+                col1, col2, col3 = st.columns([0.1, 0.5, 0.4])
                 with col1:
-                    st.markdown(f"{status_icon} {t.description}{due_str}")
+                    st.checkbox(
+                        "sel",
+                        value=default_on,
+                        key=f"sel_{idx}",
+                        label_visibility="collapsed",
+                    )
                 with col2:
+                    st.markdown(f"{status_icon} {t.description}{due_str}")
+                with col3:
                     st.selectbox(
                         "Category",
                         options=WEEKLY_CATEGORIES,
@@ -132,15 +144,20 @@ if pullable and weekly_note:
         if submitted:
             task_assignments: dict[str, list] = {cat: [] for cat in WEEKLY_CATEGORIES}
             for idx, t in enumerate(pullable):
+                if not st.session_state.get(f"sel_{idx}", False):
+                    continue
                 cat = st.session_state.get(f"cat_{idx}", WEEKLY_CATEGORIES[0])
                 task_assignments[cat].append(t)
 
             count = write_tasks_to_weekly_note(
                 weekly_note.path, task_assignments, st.session_state.vault_path,
             )
-            rescan_vault()
-            st.success(f"Pulled {count} tasks into weekly note!")
-            st.rerun()
+            if count:
+                rescan_vault()
+                st.success(f"Pulled {count} tasks into weekly note!")
+                st.rerun()
+            else:
+                st.warning("No tasks selected.")
 
 elif pullable and not weekly_note:
     for project, indexed_tasks in by_project.items():
