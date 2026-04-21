@@ -60,6 +60,18 @@ def get_project_tasks_due_next_week(notes: list[NoteFile]) -> list[Task]:
     ]
 
 
+def get_project_tasks_future(notes: list[NoteFile]) -> list[Task]:
+    """Incomplete project tasks due after next week."""
+    _, next_sun = _week_bounds(date.today() + timedelta(weeks=1))
+    return [
+        t for t in get_all_tasks(notes)
+        if t.source_folder == PROJECTS_FOLDER
+        and t.status == TaskStatus.OPEN
+        and t.due_date is not None
+        and t.due_date > next_sun
+    ]
+
+
 def get_weekly_note_tasks(notes: list[NoteFile]) -> list[Task]:
     """Open tasks already in this week's weekly note."""
     today = date.today()
@@ -140,12 +152,15 @@ def weekly_summary(notes: list[NoteFile]) -> dict:
     """Return weekly planning data sourced from projects."""
     this_week = get_project_tasks_due_this_week(notes)
     overdue = get_project_tasks_overdue(notes)
+    next_week = get_project_tasks_due_next_week(notes)
+    future = get_project_tasks_future(notes)
     weekly_note_tasks = get_weekly_note_tasks(notes)
 
     return {
         "project_tasks_this_week": this_week,
         "project_tasks_overdue": overdue,
-        "project_tasks_next_week": get_project_tasks_due_next_week(notes),
+        "project_tasks_next_week": next_week,
+        "project_tasks_future": future,
         "weekly_note_tasks": weekly_note_tasks,
         "unscheduled": get_unscheduled_project_tasks(notes),
         "this_week_by_priority": sorted(
