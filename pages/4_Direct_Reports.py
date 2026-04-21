@@ -12,8 +12,9 @@ Morning flow:
 
 import streamlit as st
 from datetime import date, timedelta
+from pathlib import Path
 
-from config import DIRECT_REPORTS_FOLDER, PROJECTS_FOLDER, WEEKLY_FOLDER
+from config import DIRECT_REPORTS_FOLDER, WEEKLY_FOLDER
 from core.models import Task, TaskStatus
 from core.rescan import rescan_vault
 from core.task_parser import get_all_tasks
@@ -77,15 +78,22 @@ def _build_task_line(t: Task) -> str:
 
 
 def _get_assignable_tasks() -> list[Task]:
-    """Open tasks from projects and weekly note, sorted by priority then due date."""
+    """Open tasks from the weekly note, sorted by project then due date."""
     return sorted(
         [
             t for t in get_all_tasks(notes)
             if t.status == TaskStatus.OPEN
-            and t.source_folder in (PROJECTS_FOLDER, WEEKLY_FOLDER)
+            and t.source_folder == WEEKLY_FOLDER
         ],
-        key=lambda t: (t.priority, t.due_date or date.max),
+        key=lambda t: (_project_name(t), t.due_date or date.max, t.priority),
     )
+
+
+def _project_name(t: Task) -> str:
+    """Derive project name from the task's project_source, or fall back to file stem."""
+    if t.project_source:
+        return Path(t.project_source).stem
+    return t.file_path.stem
 
 
 def _tasks_in_note(path) -> list[Task]:
@@ -132,33 +140,39 @@ st.divider()
 # SECTION 1: ASSIGN VAULT TASKS
 # ═══════════════════════════════════════════════════════════════════════
 
-st.subheader(f"🎯 Assign vault tasks to {selected}")
+st.subheader(f"🎯 Assign weekly tasks to {selected}")
 st.caption(
-    "Select tasks from your projects and weekly note to delegate. Each carries its "
-    "source link, so marking it done anywhere syncs back to the project and any other "
-    "copy (daily, weekly, other report notes)."
+    "Select tasks from your weekly note to delegate. Grouped by project and due date. "
+    "Each carries its source link, so marking it done anywhere syncs everywhere."
 )
 
 assignable = _get_assignable_tasks()
 
 if not assignable:
-    st.info("No open project or weekly tasks found. Scan your vault first if needed.")
+    st.info("No open tasks in the weekly note. Pull project tasks into your weekly note first.")
 else:
-    by_source: dict[str, list[Task]] = {}
-    for t in assignable:
-        by_source.setdefault(t.file_path.stem, []).append(t)
+    # Group by project, then by due date within each project
+    by_project: dict[str, dict[str, list[tuple[int, Task]]]] = {}
+    for i, t in enumerate(assignable):
+        proj = _project_name(t)
+        due_label = str(t.due_date) if t.due_date else "No due date"
+        by_project.setdefault(proj, {}).setdefault(due_label, []).append((i, t))
 
     with st.form(f"assign_form_{selected}"):
-        current_source = None
-        for i, t in enumerate(assignable):
-            if t.file_path.stem != current_source:
-                current_source = t.file_path.stem
-                folder_label = "📂 Projects" if t.source_folder == PROJECTS_FOLDER else "📅 Weekly"
-                st.markdown(f"**{folder_label} — {current_source}**")
-            due_str = f" · due {t.due_date}" if t.due_date else ""
-            overdue_badge = " 🔴" if t.is_overdue else (" 🟡" if t.is_due_today else "")
-            label = f"{overdue_badge} {_prio_icon(t)} {t.description}{due_str}".strip()
-            st.checkbox(label, key=f"assign_{i}")
+        for project, dates in by_project.items():
+            st.markdown(f"**📂 {project}**")
+            for due_label, indexed_tasks in dates.items():
+                if due_label != "No due date":
+                    sample = indexed_tasks[0][1]
+                    badge = "🔴 Overdue" if sample.is_overdue else (
+                        "🟡 Today" if sample.is_due_today else f"📅 {due_label}"
+                    )
+                    st.caption(badge)
+                else:
+                    st.caption("📅 No due date")
+                for idx, t in indexed_tasks:
+                    label = f"{_prio_icon(t)} {t.description}".strip()
+                    st.checkbox(label, key=f"assign_{idx}")
 
         submitted = st.form_submit_button(
             f"📋 Assign selected to {selected}'s plan for today", type="primary"
